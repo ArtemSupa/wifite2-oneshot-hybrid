@@ -1,41 +1,81 @@
 # Python
-venv/
-dist/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 build/
-wifite.egg-info/
-**/__pycache__
-**/*.pyc
-MANIFEST
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# IDEs
-*.bak
+# Virtual environments
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
 .idea/
-
-# Wifite
-hs/
-cracked.json
-*.wpc
-tools/hcxdumptool/
-tools/hcxtools/
-tools/iw/
-tools/reaver/
-tools/bully/
-tools/pixiewps/
-tools/hashcat/
-files.txt
 *.swp
-*.cmd
-*.ko
-*.mod
-*.mod.c
-*.mod.o
-modules.order
-*.o
-built-in.a
-Module.symvers
-*.pcap
-*.cap
-*.log
+*.swo
+*~
+.DS_Store
 
-# kimocoder
-.claude/
+# Wifite specific
+*.csv
+*.cap
+*.pcap
+*.log
+cracked.json
+cracked.txt
+hs/
+.wifite/
+
+# Temporary files
+*.tmp
+*.temp
+*.out
+/tmp/
+*.pyc
+
+# OS specific
+Thumbs.db
+.DS_Store
+
+# Session files
+*.session
+*.run
+
+# Credentials and sensitive data
+passwords.txt
+wordlist.txt
+rockyou.txt
+*.cap
+*.hccapx
+
+# Compiled
+*.o
+*.a
+*.exe
+
+# Archives (don't commit compressed versions)
+*.tar.gz
+*.zip
+*.7z
+*.rar
+
+# Test outputs
+test_output/
+test_results/

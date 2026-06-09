@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import json
 
 import subprocess
 from .airodump import Airodump
@@ -168,6 +169,8 @@ class Reaver(Attack, Dependency):
             self.reaver_proc.stdin('y\n')
 
             # Loop while reaver is running
+            oneshot_attempted = False  # Flag para evitar múltiples intentos de OneShot
+
             while self.crack_result is None and self.reaver_proc.poll() is None:
 
                 # Refresh target information (power)
@@ -181,6 +184,49 @@ class Reaver(Attack, Dependency):
                 stdout = self.get_output()
                 self.state = self.parse_state(stdout)
                 self.parse_failure(stdout)
+
+                # INTEGRACIÓN ONESHOT: Si detectamos M6 y no es Pixie-Dust ni NULL PIN
+                # Detenemos Reaver y usamos OneShot para bruteforce optimizado
+                if (self.m6_detected and self.first_half_pin and
+                    not self.pixie_dust and not self.null_pin and
+                    not oneshot_attempted):
+
+                    oneshot_attempted = True  # Marcar que ya intentamos OneShot
+
+                    # Esperar un poco para que Reaver termine su intento actual
+                    time.sleep(2)
+
+                    # Detener Reaver
+                    if self.attack_view:
+                        self.attack_view.add_log("Stopping Reaver, switching to OneShot...")
+
+                    try:
+                        self.reaver_proc.interrupt()
+                    except (OSError, RuntimeError):
+                        pass
+
+                    # Esperar a que Reaver termine
+                    timeout = 5
+                    start_wait = time.time()
+                    while self.reaver_proc.poll() is None and time.time() - start_wait < timeout:
+                        time.sleep(0.5)
+
+                    # Si no terminó, forzar
+                    if self.reaver_proc.poll() is None:
+                        try:
+                            self.reaver_proc.kill()
+                        except (OSError, RuntimeError):
+                            pass
+
+                    # Intentar con OneShot
+                    self.crack_result = self.try_oneshot_bruteforce()
+
+                    if self.crack_result is not None:
+                        # OneShot tuvo éxito, salir del loop
+                        break
+                    else:
+                        # OneShot falló, lanzar excepción para continuar con siguiente red
+                        raise Exception('OneShot bruteforce failed after M6 detection')
 
                 # Update TUI view if available
                 if self.attack_view:
@@ -211,7 +257,7 @@ class Reaver(Attack, Dependency):
                     # Add M6 detection status
                     if self.m6_detected and self.first_half_pin:
                         metrics['First 4 Digits'] = self.first_half_pin
-                        metrics['Phase'] = 'Attacking last 3 digits'
+                        metrics['Phase'] = 'Switching to OneShot' if not oneshot_attempted else 'Attacking last 3 digits'
 
                     if self.locked:
                         metrics['Status'] = 'Locked Out'
@@ -344,6 +390,151 @@ class Reaver(Attack, Dependency):
         if self.total_timeouts >= Configuration.wps_timeout_threshold:
             raise Exception('Too many timeouts (%d)' % self.total_timeouts)
 
+    def try_oneshot_bruteforce(self):
+        """
+        Intenta completar el ataque WPS usando OneShot con el PIN parcial.
+        Solo se llama cuando M6 fue detectado y tenemos los primeros 4 dígitos.
+        Retorna CrackResultWPS si tiene éxito, None si falla.
+        """
+        if not self.first_half_pin:
+            return None
+
+        # Ruta al script oneshot
+        oneshot_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                                    '..', 'OneShot', 'oneshot.py')
+
+        if not os.path.exists(oneshot_path):
+            from ..util.logger import log_warning
+            log_warning('OneShot', f'oneshot.py not found at {oneshot_path}')
+            return None
+
+        if self.attack_view:
+            self.attack_view.add_log(f"Switching to OneShot for bruteforce with first 4 digits: {self.first_half_pin}")
+            self.attack_view.set_attack_type("WPS PIN Attack (OneShot)")
+
+        self.pattack('Switching to OneShot for optimized bruteforce...', newline=True)
+
+        try:
+            # Construir comando oneshot
+            # -i interfaz -b bssid -p PIN_parcial -B (bruteforce)
+            oneshot_cmd = [
+                'python3',
+                oneshot_path,
+                '-i', Configuration.interface,
+                '-b', self.target.bssid,
+                '-p', self.first_half_pin,
+                '-B'  # Bruteforce mode
+            ]
+
+            if self.attack_view:
+                self.attack_view.add_log(f"Executing: {' '.join(oneshot_cmd)}")
+
+            from ..util.logger import log_info
+            log_info('OneShot', f'Starting bruteforce with first 4 digits: {self.first_half_pin}')
+
+            # Crear archivo temporal para output
+            oneshot_output_file = Configuration.temp('oneshot.out')
+
+            with open(oneshot_output_file, 'w') as output_file:
+                # Ejecutar oneshot
+                oneshot_proc = subprocess.Popen(
+                    oneshot_cmd,
+                    stdout=output_file,
+                    stderr=subprocess.STDOUT,
+                    universal_newlines=True
+                )
+
+                # Monitorear el proceso
+                last_log_time = time.time()
+                while oneshot_proc.poll() is None:
+                    time.sleep(1)
+
+                    # Actualizar UI cada 5 segundos
+                    if time.time() - last_log_time > 5:
+                        elapsed = int(time.time() - self.m6_detection_time)
+                        self.pattack(f'OneShot bruteforce in progress... ({Timer.secs_to_str(elapsed)})')
+                        last_log_time = time.time()
+
+                # Proceso terminó, leer output
+                with open(oneshot_output_file, 'r') as f:
+                    oneshot_output = f.read()
+
+                if Configuration.verbose > 1:
+                    Color.pe('\n{P} [oneshot:stdout] %s' % '\n [oneshot:stdout] '.join(oneshot_output.split('\n')))
+
+                # Parsear resultado de oneshot
+                # Buscar: [+] WPS PIN: '12345678'
+                #         [+] WPA PSK: 'password'
+                #         [+] AP SSID: 'name'
+
+                pin_match = re.search(r"\[.\]\s*WPS PIN:\s*['\"]?(\d+)['\"]?", oneshot_output)
+                psk_match = re.search(r"\[.\]\s*WPA PSK:\s*['\"](.+?)['\"]", oneshot_output)
+                ssid_match = re.search(r"\[.\]\s*AP SSID:\s*['\"](.+?)['\"]", oneshot_output)
+
+                if pin_match:
+                    pin = pin_match.group(1)
+                    psk = psk_match.group(1) if psk_match else None
+                    ssid = ssid_match.group(1) if ssid_match else self.target.essid
+
+                    if self.attack_view:
+                        self.attack_view.add_log(f"SUCCESS! OneShot cracked WPS PIN: {pin}")
+                        if psk:
+                            from ..util.logger import mask_sensitive
+                            self.attack_view.add_log(f"PSK (Password): {mask_sensitive(psk)}")
+                        self.attack_view.update_progress({
+                            'progress': 1.0,
+                            'status': 'WPS Cracked by OneShot!',
+                            'metrics': {
+                                'PIN': pin,
+                                'PSK': psk if psk else 'N/A',
+                                'Status': 'SUCCESS',
+                                'Method': 'OneShot'
+                            }
+                        })
+
+                    if psk:
+                        self.pattack('{G}OneShot Success! PIN: {C}%s{W} {G}PSK: {C}%s{W}' % (pin, psk), newline=True)
+                    else:
+                        self.pattack('{G}OneShot Success! PIN: {C}%s{W}' % pin, newline=True)
+
+                    # Crear resultado
+                    crack_result = CrackResultWPS(self.target.bssid, ssid, pin, psk)
+                    crack_result.dump()
+
+                    from ..util.logger import log_info
+                    log_info('OneShot', f'Successfully cracked PIN: {pin}')
+
+                    return crack_result
+                else:
+                    # OneShot falló
+                    if self.attack_view:
+                        self.attack_view.add_log("OneShot bruteforce failed to crack the PIN")
+
+                    self.pattack('{O}OneShot failed to crack the PIN{W}', newline=True)
+
+                    from ..util.logger import log_warning
+                    log_warning('OneShot', 'Failed to crack PIN')
+
+                    return None
+
+        except Exception as e:
+            if self.attack_view:
+                self.attack_view.add_log(f"OneShot error: {str(e)}")
+
+            self.pattack('{R}OneShot error: {O}%s{W}' % str(e), newline=True)
+
+            from ..util.logger import log_error
+            log_error('OneShot', f'Error: {str(e)}')
+
+            return None
+        finally:
+            # Limpiar archivo temporal
+            if os.path.exists(oneshot_output_file):
+                try:
+                    os.remove(oneshot_output_file)
+                except:
+                    pass
+
     def parse_state(self, stdout):
         state = self.state
 
@@ -402,7 +593,9 @@ class Reaver(Attack, Dependency):
         if len(percentages) > 0:
             self.progress = percentages[-1][0]
 
-        if new_pins := set(re.findall(r'Trying pin "(\d+)"', stdout_diff)):
+        # Compatible con Python 3.7+
+        new_pins = set(re.findall(r'Trying pin "(\d+)"', stdout_diff))
+        if new_pins:
             self.total_attempts += len(new_pins.difference(self.last_pins))
             self.last_pins = new_pins
 
@@ -475,29 +668,34 @@ class Reaver(Attack, Dependency):
 
         # Check for PIN.
         ''' [+] WPS pin:  11867722 '''
-        if regex := re.search(r"WPS pin:\s*(\d+)", stdout, re.IGNORECASE):
+        regex = re.search(r"WPS pin:\s*(\d+)", stdout, re.IGNORECASE)
+        if regex:
             pin = regex[1]
 
         if pin is None:
             ''' [+] WPS PIN: '11867722' '''
-            if regex := re.search(r"WPS PIN:\s*'(\d+)'", stdout, re.IGNORECASE):
+            regex = re.search(r"WPS PIN:\s*'(\d+)'", stdout, re.IGNORECASE)
+            if regex:
                 pin = regex[1]
 
         # Check for PSK.
         # Note: Reaver 1.6.x does not appear to return PSK (?)
         ''' [+] WPA PSK: 'password' '''
-        if regex := re.search(r"WPA PSK:\s*'(.+)'", stdout):
+        regex = re.search(r"WPA PSK:\s*'(.+)'", stdout)
+        if regex:
             psk = regex[1]
 
         # Check for SSID
         '''1.x [Reaver Test] [+] AP SSID: 'Test Router' '''
-        if regex := re.search(r"AP SSID:\s*'(.*)'", stdout):
+        regex = re.search(r"AP SSID:\s*'(.*)'", stdout)
+        if regex:
             ssid = regex[1]
 
         # Check (again) for SSID
         if ssid is None:
             '''1.6.x [+] Associated with EC:1A:59:37:70:0E (ESSID: belkin.00e)'''
-            if regex := re.search(r"Associated with [\dA-F:]+ \(ESSID: (.*)\)", stdout):
+            regex = re.search(r"Associated with [\dA-F:]+ \(ESSID: (.*)\)", stdout)
+            if regex:
                 ssid = regex[1]
 
         return pin, psk, ssid

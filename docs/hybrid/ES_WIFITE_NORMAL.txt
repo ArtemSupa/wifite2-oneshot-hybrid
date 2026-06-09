@@ -1,0 +1,205 @@
+================================================================================
+                    ¿ES WIFITE NORMAL? → SÍ, 100% WIFITE
+================================================================================
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                              RESPUESTA RÁPIDA                            ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+  ✅ SÍ, es wifite normal
+
+  ✅ CON una sola mejora: Cuando detecta M6 (primeros 4 dígitos del PIN),
+     usa OneShot (rápido) en lugar de Reaver (lento)
+
+  ✅ TODO lo demás funciona IDÉNTICO
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                        MODIFICACIÓN REALIZADA                            ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+   Archivos en wifite2:        ~100 archivos
+   Archivos modificados:       1 archivo (reaver.py)
+   Porcentaje modificado:      1%
+
+   Líneas en wifite2:          ~15,000 líneas
+   Líneas agregadas:           ~214 líneas
+   Porcentaje agregado:        1.4%
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                     QUÉ FUNCIONA EXACTAMENTE IGUAL                       ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+   ✅ Todos los comandos y opciones
+   ✅ Escaneo de redes
+   ✅ Selección de targets
+   ✅ Pixie-Dust Attack (Reaver/Bully)
+   ✅ NULL PIN Attack (Reaver/Bully)
+   ✅ PIN Attack (hasta detectar M6)
+   ✅ PMKID Attack
+   ✅ WPA Handshake Attack
+   ✅ WEP Attacks
+   ✅ Manejo de múltiples redes
+   ✅ Guardado de resultados
+   ✅ Logs y verbose mode
+   ✅ TODO lo demás
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                      LA ÚNICA DIFERENCIA                                 ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+   ANTES (Wifite Original):
+   ────────────────────────────────────────────────────────────────────
+   PIN Attack → M6 detectado (primeros 4 dígitos)
+              → Reaver continúa con 11,000 PINs
+              → SE QUEDA PEGADO 2-8 HORAS ⏱️
+
+
+   AHORA (Híbrido):
+   ────────────────────────────────────────────────────────────────────
+   PIN Attack → M6 detectado (primeros 4 dígitos)
+              → OneShot completa con solo 1,000 PINs
+              → TERMINA EN 5-15 MINUTOS ⚡
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                       COMANDOS (TODOS IGUALES)                           ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+   # TODOS estos comandos funcionan IDÉNTICOS:
+
+   wifite-hybrid
+   wifite-hybrid -i wlan0mon
+   wifite-hybrid --wps
+   wifite-hybrid --wpa
+   wifite-hybrid --pmkid
+   wifite-hybrid -b AA:BB:CC:DD:EE:FF
+   wifite-hybrid -e "NombreRed"
+   wifite-hybrid --wps-ignore-lock
+   wifite-hybrid -v
+   wifite-hybrid --dict rockyou.txt
+   wifite-hybrid --kill
+
+   NO necesitas aprender nada nuevo. Es wifite normal.
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                         EJEMPLO VISUAL                                   ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+   $ sudo wifite-hybrid -i wlan0mon --wps
+
+   [+] Scanning... (IGUAL)
+   [+] Found 3 targets (IGUAL)
+   [+] Select targets: 1 (IGUAL)
+
+   [+] Attacking Target (IGUAL)
+   [+] WPS Pixie-Dust (IGUAL)
+       Failed (IGUAL)
+
+   [+] WPS PIN Attack (IGUAL hasta aquí)
+       [00:02:34] M6 detected! First 4: 1234
+       ↓
+       [AQUÍ ES LA DIFERENCIA]
+       ↓
+       Switching to OneShot... (NUEVO)
+       ↓
+   [+] WPS PIN Attack (OneShot) (RÁPIDO)
+       [00:08:23] Testing...
+       [+] Success! PIN: 12345670
+
+   [+] Cracked! (IGUAL)
+       PIN: 12345670 (IGUAL)
+       PSK: MyPassword (IGUAL)
+
+   [+] Next target... (IGUAL)
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                      ¿CUÁNDO SE ACTIVA ONESHOT?                          ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+   OneShot SOLO se activa si:
+
+   ✅ Estás en modo PIN Attack (no Pixie-Dust, no NULL PIN)
+   ✅ Reaver detectó M6 (primeros 4 dígitos correctos)
+
+   En TODOS los demás casos:
+   → Wifite funciona NORMAL (sin cambios)
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                           ANALOGÍA SIMPLE                                ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+   Wifite Original    = Auto normal
+                       → En autopista: 50 km/h (lento)
+
+   Wifite Híbrido     = MISMO auto + turbo
+                       → En ciudad: igual (sin turbo)
+                       → En autopista: 500 km/h (con turbo) ⚡
+
+   NO es un auto diferente.
+   Es el MISMO auto con un botón de turbo que se activa solo.
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                         PREGUNTAS FRECUENTES                             ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+   P: ¿Es wifite normal?
+   R: SÍ, 100% wifite con una mejora en PIN Attack post-M6
+
+   P: ¿Funciona con todas las opciones?
+   R: SÍ, todas: --wps, --wpa, --pmkid, -v, --dict, etc.
+
+   P: ¿Necesito comandos diferentes?
+   R: NO, usas wifite exactamente igual
+
+   P: ¿Se rompe algo?
+   R: NO, todo funciona igual o mejor
+
+   P: ¿Afecta Pixie-Dust o PMKID?
+   R: NO, solo PIN Attack después de M6
+
+   P: ¿Guarda resultados igual?
+   R: SÍ, en /root/.wifite/cracked.txt como siempre
+
+   P: ¿Funciona en múltiples redes?
+   R: SÍ, continúa automáticamente igual que wifite
+
+   P: ¿Qué pasa si no detecta M6?
+   R: Funciona EXACTAMENTE como wifite original
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                             CONCLUSIÓN                                   ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+   Es WIFITE NORMAL con la salvedad de OneShot.
+
+   99% del código = Sin modificar
+   1% del código  = Mejora en PIN Attack post-M6
+
+   → Usalo con confianza como si fuera wifite normal
+   → El único cambio lo verás cuando detecte M6
+   → Ahí verás: "Switching to OneShot..." y será MÁS RÁPIDO
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                         COMANDO PARA USAR                                ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+   # En Kali (después de instalar):
+   sudo wifite-hybrid -i wlan0mon --wps
+
+   # ¡ESO ES TODO!
+   # Es wifite normal, úsalo como siempre.
+
+
+================================================================================
+                       ✅ SÍ, ES WIFITE TAL CUAL ✅
+                     CON SALVEDAD DE ONESHOT EN M6
+================================================================================

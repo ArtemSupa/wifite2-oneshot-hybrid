@@ -1,0 +1,276 @@
+================================================================================
+           GUÍA RÁPIDA: TRANSFERIR HÍBRIDO DE WINDOWS A KALI LINUX
+================================================================================
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                          PARTE 1: EN WINDOWS                             ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+OPCIÓN A: Comprimir Automáticamente (RECOMENDADO)
+────────────────────────────────────────────────────────────────────────────
+1. Ejecutar:
+   compress_for_linux.bat
+
+2. Se creará:
+   wifite-oneshot-hybrid.tar.gz  (o .zip)
+
+3. Copiar este archivo a:
+   - USB
+   - Transferir por SCP
+   - Subir a GitHub/GitLab (privado)
+
+
+OPCIÓN B: Comprimir Manualmente
+────────────────────────────────────────────────────────────────────────────
+1. Abrir Git Bash en: D:\Development\
+
+2. Ejecutar:
+   tar -czf wifite-hybrid.tar.gz "hibrido hack"
+
+3. El archivo wifite-hybrid.tar.gz está listo para transferir
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                      PARTE 2: TRANSFERIR A KALI                          ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+OPCIÓN A: Usando USB
+────────────────────────────────────────────────────────────────────────────
+1. Copiar wifite-hybrid.tar.gz al USB
+
+2. En Kali, insertar USB y montar:
+   lsblk
+   sudo mount /dev/sdb1 /mnt  (ajustar sdb1 según tu USB)
+   cp /mnt/wifite-hybrid.tar.gz ~/
+   sudo umount /mnt
+
+
+OPCIÓN B: Usando SCP (si Kali tiene SSH activo)
+────────────────────────────────────────────────────────────────────────────
+En Windows (Git Bash o CMD):
+   scp wifite-hybrid.tar.gz kali@192.168.1.100:~/
+
+   (Reemplazar 192.168.1.100 con la IP de tu Kali)
+
+
+OPCIÓN C: Usando Git (MEJOR para actualizaciones futuras)
+────────────────────────────────────────────────────────────────────────────
+1. En Windows:
+   cd "D:\Development\hibrido hack"
+   git init
+   git add .
+   git commit -m "Wifite + OneShot hybrid"
+   git remote add origin https://github.com/tuusuario/tu-repo.git
+   git push -u origin main
+
+2. En Kali:
+   git clone https://github.com/tuusuario/tu-repo.git
+   cd tu-repo
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                    PARTE 3: INSTALAR EN KALI                             ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+1. Descomprimir:
+   cd ~
+   tar -xzf wifite-hybrid.tar.gz
+   cd wifite-oneshot-hybrid
+
+2. Dar permisos de ejecución:
+   chmod +x install_linux.sh
+
+3. Ejecutar instalador:
+   sudo ./install_linux.sh
+
+   Esto instalará:
+   - Dependencias del sistema
+   - Python 3.8+ (si no está)
+   - Creará el comando: wifite-hybrid
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                      PARTE 4: USAR EN KALI                               ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+1. Poner interfaz en modo monitor:
+   sudo airmon-ng check kill
+   sudo airmon-ng start wlan0
+
+2. Ejecutar wifite híbrido:
+   sudo wifite-hybrid -i wlan0mon --wps
+
+   ¡El híbrido se activará automáticamente cuando detecte M6!
+
+
+3. Comandos disponibles:
+   wifite-hybrid          → Tu versión modificada (con OneShot)
+   wifite                 → Versión original de Kali (si no la desinstalaste)
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                    DIFERENCIAS IMPORTANTES                               ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+WINDOWS                           KALI LINUX
+──────────────────────────────────────────────────────────────────────────
+python                       →    python3
+D:\Development\...           →    ~/wifite-oneshot-hybrid
+Ejecutar directamente        →    sudo wifite-hybrid
+No necesita permisos root    →    Necesita sudo
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                   VERIFICAR QUE FUNCIONA                                 ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+1. Verificar instalación:
+   cd /opt/wifite-hybrid
+   python3 verify_hybrid.py
+
+   Debe mostrar: [OK] TODAS LAS VERIFICACIONES PASARON
+
+
+2. Verificar comando:
+   which wifite-hybrid
+
+   Debe mostrar: /usr/local/bin/wifite-hybrid
+
+
+3. Probar ayuda:
+   sudo wifite-hybrid --help
+
+   Debe mostrar el menú de ayuda de wifite
+
+
+4. Verificar dependencias:
+   which airmon-ng reaver wpa_supplicant pixiewps
+
+   Todas deben mostrar rutas
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                    EJEMPLO COMPLETO DE USO                               ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+# Preparar interfaz
+sudo airmon-ng check kill
+sudo airmon-ng start wlan0
+
+# Ejecutar wifite híbrido
+sudo wifite-hybrid -i wlan0mon --wps -v
+
+# Ver la magia cuando detecte M6:
+# [+] WPS PIN Attack (Reaver)
+#     [00:02:34] M6 detected! First 4 digits: 1234
+#     [!] Switching to OneShot...
+#
+# [+] WPS PIN Attack (OneShot)
+#     [00:00:45] OneShot bruteforce in progress...
+#     [+] SUCCESS! PIN: 12345670 PSK: MyPassword
+#
+# [+] Continuing to next target...
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                      ESTRUCTURA DE ARCHIVOS                              ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+Después de instalar en Kali:
+
+/opt/wifite-hybrid/
+├── wifite2/
+│   ├── wifite.py                  ← Ejecutable principal
+│   └── wifite/tools/
+│       └── reaver.py              ← Modificado con integración OneShot
+│
+├── OneShot/
+│   └── oneshot.py                 ← Llamado por wifite cuando detecta M6
+│
+├── README_HYBRID.md               ← Documentación completa
+├── LINUX_SETUP.md                 ← Guía de instalación Linux
+├── QUICK_START.md                 ← Guía rápida
+└── verify_hybrid.py               ← Script de verificación
+
+/usr/local/bin/
+└── wifite-hybrid                  ← Comando wrapper
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                        TROUBLESHOOTING                                   ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+PROBLEMA: "wifite-hybrid: command not found"
+SOLUCIÓN:
+   sudo ln -s /opt/wifite-hybrid/wifite2/wifite.py /usr/local/bin/wifite-hybrid
+   sudo chmod +x /usr/local/bin/wifite-hybrid
+
+
+PROBLEMA: "ModuleNotFoundError: No module named..."
+SOLUCIÓN:
+   cd /opt/wifite-hybrid/wifite2
+   sudo pip3 install -r requirements.txt
+
+
+PROBLEMA: "oneshot.py not found"
+SOLUCIÓN:
+   cd /opt/wifite-hybrid
+   python3 test_oneshot_path.py
+   (Verificar que OneShot esté en la ruta correcta)
+
+
+PROBLEMA: "Permission denied"
+SOLUCIÓN:
+   sudo wifite-hybrid ...
+   (Siempre ejecutar con sudo en Linux)
+
+
+PROBLEMA: "Interface not found"
+SOLUCIÓN:
+   sudo airmon-ng check kill
+   sudo airmon-ng start wlan0
+   (Reemplazar wlan0 con tu interfaz)
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                    ARCHIVOS PARA CONSULTAR                               ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+EN WINDOWS (antes de transferir):
+   STATUS.txt                → Estado del proyecto
+   LINUX_SETUP.md            → Guía completa para Linux
+   PASOS_PARA_LINUX.txt      → Este archivo
+
+EN KALI (después de instalar):
+   /opt/wifite-hybrid/README_HYBRID.md       → Documentación completa
+   /opt/wifite-hybrid/LINUX_SETUP.md         → Guía Linux
+   /opt/wifite-hybrid/QUICK_START.md         → Inicio rápido
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                         RESUMEN DE COMANDOS                              ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+EN WINDOWS:
+   compress_for_linux.bat              (Comprimir para transferir)
+
+EN KALI:
+   tar -xzf wifite-hybrid.tar.gz       (Descomprimir)
+   chmod +x install_linux.sh           (Dar permisos)
+   sudo ./install_linux.sh             (Instalar)
+   sudo wifite-hybrid -i wlan0mon      (Usar)
+
+
+================================================================================
+                          ¡LISTO PARA TRANSFERIR!
+================================================================================
+
+Pasos resumidos:
+1. En Windows: Ejecutar compress_for_linux.bat
+2. Transferir archivo .tar.gz a Kali (USB/SCP/Git)
+3. En Kali: Descomprimir y ejecutar install_linux.sh
+4. Usar: sudo wifite-hybrid -i wlan0mon --wps
+
+¡El híbrido funcionará automáticamente cuando detecte M6! 🚀
+
+================================================================================

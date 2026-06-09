@@ -1,0 +1,184 @@
+================================================================================
+                    PASOS PARA SUBIR A GITHUB
+================================================================================
+
+█████████████████████████████████████████████████████████████████████████████
+█ PASO 1: EJECUTAR SCRIPT DE PREPARACIÓN (En Git Bash)
+█████████████████████████████████████████████████████████████████████████████
+
+cd "D:\Development\hibrido hack"
+chmod +x setup_github_repo.sh
+./setup_github_repo.sh
+
+Esto creará todo automáticamente en: D:\Development\hibrido hack\temp_repo\
+
+
+█████████████████████████████████████████████████████████████████████████████
+█ PASO 2: CREAR REPOSITORIO EN GITHUB
+█████████████████████████████████████████████████████████████████████████████
+
+1. Abre: https://github.com/new
+
+2. Configuración:
+   ┌─────────────────────────────────────────────────────────────────┐
+   │ Repository name: wifite2-oneshot-hybrid                         │
+   │ Description: Wifite2 with OneShot integration for faster WPS    │
+   │ Public/Private: [Tu elección]                                   │
+   │ ☐ Add README (NO marcar - ya lo tienes)                        │
+   │ ☐ Add .gitignore (NO marcar - ya lo tienes)                    │
+   │ License: GPL-2.0 (seleccionar)                                  │
+   └─────────────────────────────────────────────────────────────────┘
+
+3. Click en "Create repository"
+
+
+█████████████████████████████████████████████████████████████████████████████
+█ PASO 3: CONECTAR Y SUBIR (En Git Bash)
+█████████████████████████████████████████████████████████████████████████████
+
+cd "D:\Development\hibrido hack\temp_repo"
+
+# Configurar tu usuario Git (cambiar con tus datos)
+git config user.name "Tu Nombre"
+git config user.email "tu@email.com"
+
+# Actualizar autor del commit
+git commit --amend --reset-author --no-edit
+
+# Conectar con GitHub (CAMBIAR TU-USUARIO)
+git remote add origin https://github.com/TU-USUARIO/wifite2-oneshot-hybrid.git
+
+# Subir
+git branch -M main
+git push -u origin main
+
+
+█████████████████████████████████████████████████████████████████████████████
+█ PASO 4: CONFIGURAR REPOSITORIO EN GITHUB
+█████████████████████████████████████████████████████████████████████████████
+
+1. Ve a: https://github.com/TU-USUARIO/wifite2-oneshot-hybrid
+
+2. Click en "Settings"
+
+3. En "General" → "Social preview":
+   - Agregar imagen (opcional)
+
+4. En "General" → "Features":
+   - ☑ Issues
+   - ☑ Projects (opcional)
+   - ☐ Wiki (opcional)
+
+5. En la página principal, agregar Topics (tags):
+   Click en el engranaje ⚙️ junto a "About"
+
+   Topics a agregar:
+   - wifite
+   - wifite2
+   - oneshot
+   - wifi-security
+   - wps-attack
+   - penetration-testing
+   - kali-linux
+   - security-tools
+   - python
+
+
+█████████████████████████████████████████████████████████████████████████████
+█ ✓ LISTO! TU REPOSITORIO ESTÁ EN GITHUB
+█████████████████████████████████████████████████████████████████████████████
+
+URL: https://github.com/TU-USUARIO/wifite2-oneshot-hybrid
+
+
+█████████████████████████████████████████████████████████████████████████████
+█ OPCIONAL: AGREGAR BADGES AL README
+█████████████████████████████████████████████████████████████████████████████
+
+Edita README.md en GitHub y agrega al inicio:
+
+```markdown
+# Wifite2 + OneShot Hybrid
+
+![License](https://img.shields.io/badge/license-GPL--2.0-blue.svg)
+![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
+![Platform](https://img.shields.io/badge/platform-Linux-lightgrey.svg)
+![GitHub stars](https://img.shields.io/github/stars/TU-USUARIO/wifite2-oneshot-hybrid.svg)
+![GitHub forks](https://img.shields.io/github/forks/TU-USUARIO/wifite2-oneshot-hybrid.svg)
+```
+
+
+█████████████████████████████████████████████████████████████████████████████
+█ COMANDOS ÚTILES PARA EL FUTURO
+█████████████████████████████████████████████████████████████████████████████
+
+# Actualizar después de hacer cambios:
+cd "D:\Development\hibrido hack\temp_repo"
+git add .
+git commit -m "Descripción del cambio"
+git push
+
+# Actualizar submódulo OneShot:
+cd OneShot
+git pull origin master
+cd ..
+git add OneShot
+git commit -m "Update OneShot to latest version"
+git push
+
+# Ver estado:
+git status
+
+# Ver historial:
+git log --oneline
+
+# Crear nueva rama:
+git checkout -b feature-nueva
+git push -u origin feature-nueva
+
+
+█████████████████████████████████████████████████████████████████████████████
+█ RESUMEN DE LO QUE SE CREÓ
+█████████████████████████████████████████████████████████████████████████████
+
+temp_repo/
+├── .git/                        (repositorio git)
+├── .github/
+│   ├── ISSUE_TEMPLATE.md        (template para issues)
+│   └── PULL_REQUEST_TEMPLATE.md (template para PRs)
+├── .gitignore                   (archivos a ignorar)
+├── LICENSE                      (GPL v2)
+├── README.md                    (documentación principal)
+├── CREDITS.md                   (créditos)
+├── install_linux.sh             (instalador)
+├── verify_hybrid.py             (verificador)
+├── docs/
+│   └── hybrid/                  (documentación adicional)
+├── wifite/                      (código wifite2 modificado)
+│   ├── attack/
+│   │   └── wps.py              (★ MODIFICADO: PSK recovery)
+│   └── tools/
+│       └── reaver.py            (★ MODIFICADO: M6 detection)
+└── OneShot/                     (submódulo de git)
+
+
+█████████████████████████████████████████████████████████████████████████████
+█ ¿QUÉ HACER SI ALGO SALE MAL?
+█████████████████████████████████████████████████████████████████████████████
+
+Problema: "Permission denied (publickey)"
+Solución: Configurar SSH key en GitHub
+   https://docs.github.com/en/authentication/connecting-to-github-with-ssh
+
+Problema: "Repository not found"
+Solución: Verificar que el nombre del repo sea correcto en el comando
+
+Problema: Quiero empezar de nuevo
+Solución:
+   rm -rf temp_repo
+   ./setup_github_repo.sh
+
+
+================================================================================
+                    ¡TODO LISTO PARA GITHUB! 🚀
+================================================================================

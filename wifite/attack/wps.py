@@ -1,15 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import os
+import re
 import time
+import subprocess
 
 from ..model.attack import Attack
 from ..util.color import Color
-from ..util.logger import log_info, log_debug
+from ..util.logger import log_info, log_debug, log_warning, log_error
 from ..config import Configuration
 from ..util.output import OutputManager
 from ..tools.bully import Bully
 from ..tools.reaver import Reaver
+from ..model.wps_result import CrackResultWPS
 
 
 class AttackWPS(Attack):
@@ -103,6 +107,129 @@ class AttackWPS(Attack):
         self.success = False
         return False
 
+    def try_oneshot_with_pin(self, pin):
+        """
+        Intenta obtener la PSK usando OneShot con el PIN WPS completo.
+        Se llama cuando se obtiene el PIN pero no la PSK.
+        Retorna CrackResultWPS con PSK si tiene éxito, None si falla.
+        """
+        if not pin:
+            return None
+
+        # Ruta al script oneshot
+        oneshot_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                                    '..', 'OneShot', 'oneshot.py')
+
+        if not os.path.exists(oneshot_path):
+            log_warning('OneShot', f'oneshot.py not found at {oneshot_path}')
+            return None
+
+        Color.pl('{!} {O}PSK not found, trying OneShot with PIN {C}%s{W}...' % pin)
+        if self.view:
+            self.view.add_log(f"PSK not found, attempting to obtain it with OneShot...")
+            self.view.set_attack_type("WPS PIN Recovery (OneShot)")
+
+        log_info('OneShot', f'Attempting to get PSK with PIN: {pin}')
+
+        try:
+            # Construir comando oneshot con PIN completo
+            oneshot_cmd = [
+                'python3',
+                oneshot_path,
+                '-i', Configuration.interface,
+                '-b', self.target.bssid,
+                '-p', pin  # PIN completo
+            ]
+
+            if self.view:
+                self.view.add_log(f"Executing: {' '.join(oneshot_cmd)}")
+
+            # Crear archivo temporal para output
+            oneshot_output_file = Configuration.temp('oneshot_pin.out')
+
+            with open(oneshot_output_file, 'w') as output_file:
+                # Ejecutar oneshot
+                oneshot_proc = subprocess.Popen(
+                    oneshot_cmd,
+                    stdout=output_file,
+                    stderr=subprocess.STDOUT,
+                    universal_newlines=True
+                )
+
+                # Monitorear el proceso
+                last_update_time = time.time()
+                while oneshot_proc.poll() is None:
+                    time.sleep(1)
+
+                    # Actualizar UI cada 5 segundos
+                    if time.time() - last_update_time > 5:
+                        Color.p('.')
+                        last_update_time = time.time()
+
+                Color.pl('')  # Nueva línea después de los puntos
+
+                # Proceso terminó, leer output
+                with open(oneshot_output_file, 'r') as f:
+                    oneshot_output = f.read()
+
+                if Configuration.verbose > 1:
+                    Color.pe('\n{P} [oneshot:stdout] %s' % '\n [oneshot:stdout] '.join(oneshot_output.split('\n')))
+
+                # Parsear resultado de oneshot
+                psk_match = re.search(r"\[.\]\s*WPA PSK:\s*['\"](.+?)['\"]", oneshot_output)
+                ssid_match = re.search(r"\[.\]\s*AP SSID:\s*['\"](.+?)['\"]", oneshot_output)
+
+                if psk_match:
+                    psk = psk_match.group(1)
+                    ssid = ssid_match.group(1) if ssid_match else self.target.essid
+
+                    Color.pl('{+} {G}OneShot Success! PSK: {C}%s{W}' % psk)
+
+                    if self.view:
+                        self.view.add_log(f"SUCCESS! PSK obtained: {psk}")
+                        from ..util.logger import mask_sensitive
+                        self.view.update_progress({
+                            'progress': 1.0,
+                            'status': 'PSK obtained with OneShot!',
+                            'metrics': {
+                                'PIN': pin,
+                                'PSK': mask_sensitive(psk),
+                                'Status': 'SUCCESS',
+                                'Method': 'OneShot'
+                            }
+                        })
+
+                    log_info('OneShot', f'Successfully obtained PSK with PIN: {pin}')
+
+                    # Crear resultado completo
+                    crack_result = CrackResultWPS(self.target.bssid, ssid, pin, psk)
+                    return crack_result
+                else:
+                    # OneShot falló
+                    Color.pl('{!} {O}OneShot failed to get PSK with PIN{W}')
+
+                    if self.view:
+                        self.view.add_log("OneShot failed to obtain PSK")
+
+                    log_warning('OneShot', 'Failed to obtain PSK with PIN')
+                    return None
+
+        except Exception as e:
+            Color.pl('{!} {R}OneShot error: {O}%s{W}' % str(e))
+
+            if self.view:
+                self.view.add_log(f"OneShot error: {str(e)}")
+
+            log_error('OneShot', f'Error: {str(e)}')
+            return None
+        finally:
+            # Limpiar archivo temporal
+            if os.path.exists(oneshot_output_file):
+                try:
+                    os.remove(oneshot_output_file)
+                except:
+                    pass
+
     def run_bully(self):
         log_debug('AttackWPS', 'Using bully for WPS attack')
         bully = Bully(self.target, pixie_dust=self.pixie_dust)
@@ -112,6 +239,15 @@ class AttackWPS(Attack):
         bully.run()
         bully.stop()
         self.crack_result = bully.crack_result
+
+        # Si tenemos PIN pero no PSK, intentar con OneShot
+        if self.crack_result and self.crack_result.pin and not self.crack_result.psk:
+            log_info('AttackWPS', 'PIN found but no PSK, trying OneShot...')
+            oneshot_result = self.try_oneshot_with_pin(self.crack_result.pin)
+            if oneshot_result and oneshot_result.psk:
+                # OneShot obtuvo la PSK, actualizar resultado
+                self.crack_result = oneshot_result
+
         self.success = self.crack_result is not None
         log_info('AttackWPS', 'WPS bully attack on %s finished in %.1fs — %s' % (
             self.target.bssid, time.time() - getattr(self, '_attack_start', time.time()),
@@ -126,6 +262,15 @@ class AttackWPS(Attack):
             reaver.attack_view = self.view
         reaver.run()
         self.crack_result = reaver.crack_result
+
+        # Si tenemos PIN pero no PSK, intentar con OneShot
+        if self.crack_result and self.crack_result.pin and not self.crack_result.psk:
+            log_info('AttackWPS', 'PIN found but no PSK, trying OneShot...')
+            oneshot_result = self.try_oneshot_with_pin(self.crack_result.pin)
+            if oneshot_result and oneshot_result.psk:
+                # OneShot obtuvo la PSK, actualizar resultado
+                self.crack_result = oneshot_result
+
         self.success = self.crack_result is not None
         log_info('AttackWPS', 'WPS reaver attack on %s finished in %.1fs — %s' % (
             self.target.bssid, time.time() - getattr(self, '_attack_start', time.time()),
