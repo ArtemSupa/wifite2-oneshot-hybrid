@@ -8,7 +8,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}================================================${NC}"
-echo -e "${BLUE}  INSTALADOR HÍBRIDO WIFITE + ONESHOT${NC}"
+echo -e "${BLUE}  INSTALADOR WIFITE2-ONESHOT-HYBRID${NC}"
 echo -e "${BLUE}================================================${NC}"
 echo ""
 
@@ -18,29 +18,55 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# Obtener el directorio actual
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 # Verificar que estamos en el directorio correcto
-if [ ! -d "wifite2" ] || [ ! -d "OneShot" ]; then
-    echo -e "${RED}[!] Error: No se encuentran los directorios wifite2 y OneShot${NC}"
-    echo -e "${YELLOW}    Asegúrate de ejecutar este script desde la carpeta del híbrido${NC}"
+if [ ! -d "wifite" ] || [ ! -f "wifite.py" ]; then
+    echo -e "${RED}[!] Error: No se encuentra la estructura correcta del proyecto${NC}"
+    echo -e "${YELLOW}    Asegúrate de ejecutar este script desde la raíz del repositorio${NC}"
+    echo -e "${YELLOW}    Debe existir: wifite/ y wifite.py${NC}"
     exit 1
 fi
 
-# Directorio de instalación
-INSTALL_DIR="/opt/wifite-hybrid"
+echo -e "${GREEN}[✓] Directorio correcto detectado${NC}"
+echo ""
 
-echo -e "${YELLOW}[1/7]${NC} Instalando dependencias del sistema..."
-apt update > /dev/null 2>&1
-apt install -y python3 python3-pip aircrack-ng reaver pixiewps wpasupplicant wireless-tools net-tools bc > /dev/null 2>&1
+# Verificar que OneShot esté inicializado
+if [ ! -d "OneShot" ] || [ ! -f "OneShot/oneshot.py" ]; then
+    echo -e "${YELLOW}[!] OneShot no está inicializado. Inicializando submódulo...${NC}"
+    git submodule update --init --recursive
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}[!] Error al inicializar OneShot${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}[✓] OneShot inicializado${NC}"
+fi
 
+echo ""
+echo -e "${YELLOW}[1/6]${NC} Actualizando repositorios..."
+apt update
 if [ $? -eq 0 ]; then
-    echo -e "${GREEN}      ✓ Dependencias instaladas${NC}"
+    echo -e "${GREEN}      ✓ Repositorios actualizados${NC}"
+else
+    echo -e "${RED}      ✗ Error al actualizar repositorios${NC}"
+    exit 1
+fi
+
+echo ""
+echo -e "${YELLOW}[2/6]${NC} Instalando dependencias del sistema..."
+echo -e "${BLUE}      Esto puede tardar varios minutos...${NC}"
+apt install -y python3 python3-pip aircrack-ng reaver pixiewps wpasupplicant wireless-tools net-tools bc
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}      ✓ Dependencias del sistema instaladas${NC}"
 else
     echo -e "${RED}      ✗ Error al instalar dependencias${NC}"
     exit 1
 fi
 
 echo ""
-echo -e "${YELLOW}[2/7]${NC} Verificando Python 3.8+..."
+echo -e "${YELLOW}[3/6]${NC} Verificando Python 3.8+..."
 PYTHON_VERSION=$(python3 --version | grep -oP '(?<=Python )\d+\.\d+' | head -1)
 if [ -n "$PYTHON_VERSION" ]; then
     MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
@@ -49,124 +75,118 @@ if [ -n "$PYTHON_VERSION" ]; then
     if [ "$MAJOR" -ge 3 ] && [ "$MINOR" -ge 8 ]; then
         echo -e "${GREEN}      ✓ Python $PYTHON_VERSION detectado${NC}"
     else
-        echo -e "${RED}      ✗ Python $PYTHON_VERSION es menor que 3.8${NC}"
-        echo -e "${YELLOW}        Continuando de todos modos...${NC}"
+        echo -e "${YELLOW}      ⚠ Python $PYTHON_VERSION detectado (recomendado 3.8+)${NC}"
     fi
 else
     echo -e "${RED}      ✗ No se pudo detectar la versión de Python${NC}"
+    exit 1
 fi
 
 echo ""
-echo -e "${YELLOW}[3/7]${NC} Copiando archivos a $INSTALL_DIR..."
-mkdir -p $INSTALL_DIR
-
-# Copiar archivos
-cp -r wifite2 $INSTALL_DIR/
-cp -r OneShot $INSTALL_DIR/
-
-# Copiar documentación si existe
-for file in README_HYBRID.md RESUMEN_FINAL.md QUICK_START.md LINUX_SETUP.md STATUS.txt; do
-    if [ -f "$file" ]; then
-        cp "$file" $INSTALL_DIR/
+echo -e "${YELLOW}[4/6]${NC} Instalando dependencias Python..."
+if [ -f "requirements.txt" ]; then
+    echo -e "${BLUE}      Instalando desde requirements.txt...${NC}"
+    pip3 install -r requirements.txt
+    if [ $? -ne 0 ]; then
+        echo -e "${YELLOW}      ⚠ Algunas dependencias pueden haber fallado${NC}"
     fi
-done
-
-# Copiar scripts de verificación
-for file in verify_hybrid.py test_integration.py test_oneshot_path.py; do
-    if [ -f "$file" ]; then
-        cp "$file" $INSTALL_DIR/
-    fi
-done
-
-echo -e "${GREEN}      ✓ Archivos copiados${NC}"
+else
+    echo -e "${YELLOW}      ⚠ requirements.txt no encontrado${NC}"
+fi
 
 echo ""
-echo -e "${YELLOW}[4/7]${NC} Configurando permisos..."
-chmod +x $INSTALL_DIR/wifite2/wifite.py
-chmod +x $INSTALL_DIR/OneShot/oneshot.py
+echo -e "${YELLOW}[5/6]${NC} Instalando Wifite2-OneShot-Hybrid..."
+python3 setup.py install
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}      ✓ Wifite2-OneShot-Hybrid instalado${NC}"
+else
+    echo -e "${RED}      ✗ Error en la instalación${NC}"
+    exit 1
+fi
 
-if [ -f "$INSTALL_DIR/verify_hybrid.py" ]; then
-    chmod +x $INSTALL_DIR/verify_hybrid.py
+echo ""
+echo -e "${YELLOW}[6/6]${NC} Configurando permisos y enlaces simbólicos..."
+
+# Hacer ejecutable OneShot
+if [ -f "OneShot/oneshot.py" ]; then
+    chmod +x OneShot/oneshot.py
+
+    # Crear enlace simbólico para OneShot (opcional)
+    if [ ! -f "/usr/local/bin/oneshot" ]; then
+        ln -s "$SCRIPT_DIR/OneShot/oneshot.py" /usr/local/bin/oneshot 2>/dev/null || true
+    fi
+fi
+
+# Hacer ejecutable verify_hybrid.py
+if [ -f "verify_hybrid.py" ]; then
+    chmod +x verify_hybrid.py
 fi
 
 echo -e "${GREEN}      ✓ Permisos configurados${NC}"
-
-echo ""
-echo -e "${YELLOW}[5/7]${NC} Instalando dependencias Python de wifite..."
-cd $INSTALL_DIR/wifite2
-
-# Instalar desde requirements.txt si existe
-if [ -f "requirements.txt" ]; then
-    pip3 install -r requirements.txt > /dev/null 2>&1
-fi
-
-# Instalar wifite en modo desarrollo
-python3 setup.py install > /dev/null 2>&1
-
-echo -e "${GREEN}      ✓ Dependencias Python instaladas${NC}"
-
-echo ""
-echo -e "${YELLOW}[6/7]${NC} Creando comando 'wifite-hybrid'..."
-
-# Crear wrapper script
-cat > /usr/local/bin/wifite-hybrid <<'WRAPPER_EOF'
-#!/bin/bash
-cd /opt/wifite-hybrid/wifite2
-exec python3 wifite.py "$@"
-WRAPPER_EOF
-
-chmod +x /usr/local/bin/wifite-hybrid
-
-echo -e "${GREEN}      ✓ Comando creado en /usr/local/bin/wifite-hybrid${NC}"
-
-echo ""
-echo -e "${YELLOW}[7/7]${NC} Verificando instalación..."
-
-cd $INSTALL_DIR
-if [ -f "verify_hybrid.py" ]; then
-    python3 verify_hybrid.py 2>&1 | grep -q "TODAS LAS VERIFICACIONES PASARON"
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}      ✓ Verificación exitosa${NC}"
-    else
-        echo -e "${YELLOW}      ⚠ Advertencia: Algunas verificaciones fallaron${NC}"
-        echo -e "${YELLOW}        Ejecuta: cd $INSTALL_DIR && python3 verify_hybrid.py${NC}"
-    fi
-else
-    echo -e "${YELLOW}      ⚠ Script de verificación no encontrado${NC}"
-fi
 
 echo ""
 echo -e "${GREEN}================================================${NC}"
 echo -e "${GREEN}  ✓ INSTALACIÓN COMPLETADA${NC}"
 echo -e "${GREEN}================================================${NC}"
 echo ""
-echo -e "${BLUE}Comandos disponibles:${NC}"
-echo -e "  ${GREEN}wifite-hybrid${NC}        → Wifite con integración OneShot (tu versión modificada)"
-echo -e "  ${GREEN}wifite${NC}               → Wifite original de Kali (si está instalado)"
+
+# Verificar instalación
+echo -e "${BLUE}Verificando instalación...${NC}"
 echo ""
-echo -e "${BLUE}Ejemplo de uso:${NC}"
-echo -e "  ${YELLOW}sudo airmon-ng start wlan0${NC}"
-echo -e "  ${YELLOW}sudo wifite-hybrid -i wlan0mon --wps${NC}"
+
+if command -v wifite &> /dev/null; then
+    WIFITE_VERSION=$(wifite --version 2>&1 | head -1)
+    echo -e "${GREEN}[✓] Wifite instalado: ${WIFITE_VERSION}${NC}"
+else
+    echo -e "${RED}[✗] Wifite no encontrado en PATH${NC}"
+fi
+
+if [ -f "OneShot/oneshot.py" ]; then
+    echo -e "${GREEN}[✓] OneShot disponible en: $SCRIPT_DIR/OneShot/oneshot.py${NC}"
+else
+    echo -e "${RED}[✗] OneShot no encontrado${NC}"
+fi
+
 echo ""
-echo -e "${BLUE}Uso con opciones:${NC}"
-echo -e "  ${YELLOW}sudo wifite-hybrid -i wlan0mon --wps -v${NC}           (modo verbose)"
-echo -e "  ${YELLOW}sudo wifite-hybrid -i wlan0mon --wps-ignore-lock${NC}  (ignorar APs bloqueados)"
-echo -e "  ${YELLOW}sudo wifite-hybrid -i wlan0mon -b AA:BB:CC:DD:EE:FF${NC}  (atacar BSSID específico)"
+echo -e "${BLUE}================================================${NC}"
+echo -e "${BLUE}  COMANDOS DISPONIBLES${NC}"
+echo -e "${BLUE}================================================${NC}"
 echo ""
-echo -e "${BLUE}Archivos instalados en:${NC} ${GREEN}$INSTALL_DIR${NC}"
+echo -e "${GREEN}Wifite (versión híbrida con OneShot):${NC}"
+echo -e "  ${YELLOW}sudo wifite -i wlan0mon --wps${NC}"
 echo ""
-echo -e "${BLUE}Documentación:${NC}"
-echo -e "  ${GREEN}cat $INSTALL_DIR/LINUX_SETUP.md${NC}      (guía completa Linux)"
-echo -e "  ${GREEN}cat $INSTALL_DIR/README_HYBRID.md${NC}    (documentación del híbrido)"
-echo -e "  ${GREEN}cat $INSTALL_DIR/QUICK_START.md${NC}      (guía rápida)"
+echo -e "${GREEN}OneShot (directo):${NC}"
+echo -e "  ${YELLOW}sudo $SCRIPT_DIR/OneShot/oneshot.py -i wlan0mon${NC}"
+if command -v oneshot &> /dev/null; then
+    echo -e "  ${YELLOW}sudo oneshot -i wlan0mon${NC}  ${BLUE}(atajo)${NC}"
+fi
 echo ""
-echo -e "${BLUE}Verificar instalación:${NC}"
-echo -e "  ${GREEN}cd $INSTALL_DIR && python3 verify_hybrid.py${NC}"
+echo -e "${BLUE}================================================${NC}"
+echo -e "${BLUE}  PASOS SIGUIENTES${NC}"
+echo -e "${BLUE}================================================${NC}"
+echo ""
+echo -e "1. Poner interfaz en modo monitor:"
+echo -e "   ${YELLOW}sudo airmon-ng start wlan0${NC}"
+echo ""
+echo -e "2. Ejecutar Wifite:"
+echo -e "   ${YELLOW}sudo wifite -i wlan0mon --wps -v${NC}"
+echo ""
+echo -e "3. Verificar integración híbrida:"
+echo -e "   ${YELLOW}python3 $SCRIPT_DIR/verify_hybrid.py${NC}"
+echo ""
+echo -e "${BLUE}================================================${NC}"
+echo -e "${BLUE}  DOCUMENTACIÓN${NC}"
+echo -e "${BLUE}================================================${NC}"
+echo ""
+echo -e "README:           ${GREEN}cat $SCRIPT_DIR/README.md${NC}"
+echo -e "Créditos:         ${GREEN}cat $SCRIPT_DIR/CREDITS.md${NC}"
+
+if [ -d "docs/hybrid" ]; then
+    echo -e "Docs híbrido:     ${GREEN}ls $SCRIPT_DIR/docs/hybrid/${NC}"
+fi
+
 echo ""
 echo -e "${GREEN}================================================${NC}"
 echo -e "${GREEN}  ¡Listo para usar! Happy Hacking! 🚀${NC}"
 echo -e "${GREEN}================================================${NC}"
 echo ""
-
-# Volver al directorio original
-cd - > /dev/null 2>&1

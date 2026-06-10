@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script de verificación para el híbrido Wifite2 + OneShot
+Script de verificación para Wifite2-OneShot-Hybrid
 
 Verifica que:
 1. La estructura de carpetas es correcta
@@ -27,10 +27,11 @@ def color_text(text, color_code):
 def check_file_exists(path, description):
     """Verifica si un archivo existe"""
     if os.path.exists(path):
-        print(f"  [OK] {color_text(description, 'green')}: {path}")
+        print(f"  [✓] {color_text(description, 'green')}")
         return True
     else:
-        print(f"  [FAIL] {color_text(description, 'red')}: {path} (NO ENCONTRADO)")
+        print(f"  [✗] {color_text(f'{description} (NO ENCONTRADO)', 'red')}")
+        print(f"       Ruta esperada: {path}")
         return False
 
 def check_command_exists(command, description):
@@ -39,57 +40,88 @@ def check_command_exists(command, description):
         result = subprocess.run([command, '--version'],
                               capture_output=True,
                               timeout=5)
-        print(f"  [OK] {color_text(description, 'green')}: {command}")
+        print(f"  [✓] {color_text(description, 'green')}")
         return True
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        print(f"  [FAIL] {color_text(description, 'red')}: {command} (NO ENCONTRADO)")
+        print(f"  [✗] {color_text(f'{description} (NO ENCONTRADO)', 'yellow')}")
         return False
 
 def check_reaver_modifications():
     """Verifica que las modificaciones en reaver.py se aplicaron"""
-    reaver_path = os.path.join(os.path.dirname(__file__), 'wifite2', 'wifite', 'tools', 'reaver.py')
+    reaver_path = os.path.join(os.path.dirname(__file__), 'wifite', 'tools', 'reaver.py')
 
     if not os.path.exists(reaver_path):
-        print(f"  ✗ {color_text('reaver.py no encontrado', 'red')}")
+        print(f"  [✗] {color_text('reaver.py no encontrado', 'red')}")
+        print(f"       Ruta esperada: {reaver_path}")
         return False
 
-    with open(reaver_path, 'r', encoding='utf-8') as f:
+    with open(reaver_path, 'r', encoding='utf-8', errors='ignore') as f:
         content = f.read()
 
+    # Modificaciones para M6 detection
     checks = [
-        ('import json', 'Import de json agregado'),
         ('try_oneshot_bruteforce', 'Método try_oneshot_bruteforce agregado'),
         ('oneshot_attempted', 'Flag oneshot_attempted agregado'),
-        ('oneshot_path =', 'Ruta de oneshot configurada'),
-        ('Switching to OneShot', 'Mensaje de switch a OneShot presente')
+        ('M6 detected', 'Detección de M6 implementada'),
     ]
 
     all_ok = True
     for check_str, description in checks:
         if check_str in content:
-            print(f"  [OK] {color_text(description, 'green')}")
+            print(f"  [✓] {color_text(description, 'green')}")
         else:
-            print(f"  [FAIL] {color_text(description, 'red')}")
+            print(f"  [✗] {color_text(description, 'red')}")
+            all_ok = False
+
+    return all_ok
+
+def check_wps_modifications():
+    """Verifica que las modificaciones en wps.py se aplicaron"""
+    wps_path = os.path.join(os.path.dirname(__file__), 'wifite', 'attack', 'wps.py')
+
+    if not os.path.exists(wps_path):
+        print(f"  [✗] {color_text('wps.py no encontrado', 'red')}")
+        print(f"       Ruta esperada: {wps_path}")
+        return False
+
+    with open(wps_path, 'r', encoding='utf-8', errors='ignore') as f:
+        content = f.read()
+
+    # Modificaciones para PSK recovery
+    checks = [
+        ('try_oneshot_with_pin', 'Método try_oneshot_with_pin agregado'),
+        ('PSK not found, trying OneShot', 'Recuperación automática de PSK implementada'),
+    ]
+
+    all_ok = True
+    for check_str, description in checks:
+        if check_str in content:
+            print(f"  [✓] {color_text(description, 'green')}")
+        else:
+            print(f"  [✗] {color_text(description, 'red')}")
             all_ok = False
 
     return all_ok
 
 def main():
     print("\n" + "="*70)
-    print(color_text("VERIFICACIÓN DEL HÍBRIDO WIFITE2 + ONESHOT", 'blue'))
+    print(color_text("VERIFICACIÓN DE WIFITE2-ONESHOT-HYBRID", 'blue'))
     print("="*70 + "\n")
 
-    base_dir = os.path.dirname(__file__)
+    base_dir = os.path.dirname(os.path.abspath(__file__))
     all_checks_passed = True
 
     # 1. Verificar estructura de carpetas
     print(color_text("1. Estructura de Carpetas", 'yellow'))
     checks = [
-        (os.path.join(base_dir, 'wifite2'), 'Carpeta wifite2'),
+        (os.path.join(base_dir, 'wifite'), 'Carpeta wifite'),
         (os.path.join(base_dir, 'OneShot'), 'Carpeta OneShot'),
-        (os.path.join(base_dir, 'wifite2', 'wifite.py'), 'wifite.py principal'),
+        (os.path.join(base_dir, 'wifite.py'), 'wifite.py principal'),
         (os.path.join(base_dir, 'OneShot', 'oneshot.py'), 'oneshot.py principal'),
-        (os.path.join(base_dir, 'wifite2', 'wifite', 'tools', 'reaver.py'), 'reaver.py modificado'),
+        (os.path.join(base_dir, 'wifite', 'tools', 'reaver.py'), 'reaver.py'),
+        (os.path.join(base_dir, 'wifite', 'attack', 'wps.py'), 'wps.py'),
+        (os.path.join(base_dir, 'setup.py'), 'setup.py'),
+        (os.path.join(base_dir, 'requirements.txt'), 'requirements.txt'),
     ]
 
     for path, desc in checks:
@@ -98,52 +130,73 @@ def main():
 
     print()
 
-    # 2. Verificar modificaciones en reaver.py
-    print(color_text("2. Modificaciones en reaver.py", 'yellow'))
+    # 2. Verificar modificaciones en reaver.py (M6 Detection)
+    print(color_text("2. Modificaciones en reaver.py (M6 Detection)", 'yellow'))
     if not check_reaver_modifications():
         all_checks_passed = False
 
     print()
 
-    # 3. Verificar dependencias del sistema
-    print(color_text("3. Dependencias del Sistema", 'yellow'))
-
-    # Verificar Python
-    python_cmd = 'python3' if sys.platform != 'win32' else 'python'
-    if not check_command_exists(python_cmd, f'Python ({python_cmd})'):
+    # 3. Verificar modificaciones en wps.py (PSK Recovery)
+    print(color_text("3. Modificaciones en wps.py (PSK Recovery)", 'yellow'))
+    if not check_wps_modifications():
         all_checks_passed = False
-
-    # Verificar herramientas de WiFi
-    wifi_tools = [
-        ('airmon-ng', 'Airmon-ng (aircrack-ng suite)'),
-        ('reaver', 'Reaver'),
-        ('wpa_supplicant', 'wpa_supplicant (para OneShot)'),
-    ]
-
-    for cmd, desc in wifi_tools:
-        check_command_exists(cmd, desc)
-        # No marcar como fallo crítico porque pueden no estar en PATH en Windows
 
     print()
 
-    # 4. Verificar configuración para Windows
-    if sys.platform == 'win32':
-        print(color_text("4. Configuración Windows/MINGW64", 'yellow'))
-        print(f"  [WARN] {color_text('Estás en Windows', 'yellow')}")
-        print(f"    Si 'python3' no funciona, edita reaver.py línea ~358:")
-        print(f"    Cambiar 'python3' por 'python'")
+    # 4. Verificar dependencias del sistema (solo en Linux)
+    if sys.platform.startswith('linux'):
+        print(color_text("4. Dependencias del Sistema", 'yellow'))
+
+        # Verificar Python
+        if not check_command_exists('python3', 'Python 3'):
+            all_checks_passed = False
+
+        # Verificar herramientas de WiFi (no crítico, solo informativo)
+        print(color_text("\n   Herramientas WiFi (opcional):", 'blue'))
+        wifi_tools = [
+            ('airmon-ng', 'Airmon-ng'),
+            ('reaver', 'Reaver'),
+            ('wpa_supplicant', 'wpa_supplicant'),
+            ('pixiewps', 'PixieWPS'),
+        ]
+
+        for cmd, desc in wifi_tools:
+            check_command_exists(cmd, desc)
+
+        print()
+    else:
+        print(color_text("4. Plataforma Detectada", 'yellow'))
+        print(f"  [!] {color_text('No estás en Linux', 'yellow')}")
+        print(f"      Este proyecto está diseñado para Linux (Kali, Ubuntu, etc.)")
         print()
 
-    # 5. Resumen
+    # 5. Verificar submódulo OneShot
+    print(color_text("5. Submódulo OneShot", 'yellow'))
+    oneshot_path = os.path.join(base_dir, 'OneShot', 'oneshot.py')
+    if os.path.exists(oneshot_path) and os.path.getsize(oneshot_path) > 1000:
+        print(f"  [✓] {color_text('OneShot está correctamente inicializado', 'green')}")
+    else:
+        print(f"  [✗] {color_text('OneShot no está inicializado', 'red')}")
+        print(f"      Ejecuta: git submodule update --init --recursive")
+        all_checks_passed = False
+
+    print()
+
+    # 6. Resumen
     print("="*70)
     if all_checks_passed:
-        print(color_text("[OK] TODAS LAS VERIFICACIONES PASARON", 'green'))
-        print("\nPuedes ejecutar wifite con:")
-        print(f"  cd wifite2")
-        print(f"  sudo {python_cmd} wifite.py")
+        print(color_text("✓ TODAS LAS VERIFICACIONES PASARON", 'green'))
+        print("\n" + color_text("Instalación:", 'blue'))
+        print(f"  sudo ./install_linux.sh")
+        print("\n" + color_text("Uso:", 'blue'))
+        print(f"  sudo airmon-ng start wlan0")
+        print(f"  sudo wifite -i wlan0mon --wps -v")
     else:
-        print(color_text("[FAIL] ALGUNAS VERIFICACIONES FALLARON", 'red'))
-        print("\nRevisa los errores arriba y consulta README_HYBRID.md")
+        print(color_text("✗ ALGUNAS VERIFICACIONES FALLARON", 'red'))
+        print("\nRevisa los errores arriba.")
+        print("\nSi OneShot no está inicializado:")
+        print("  git submodule update --init --recursive")
     print("="*70 + "\n")
 
     return 0 if all_checks_passed else 1
