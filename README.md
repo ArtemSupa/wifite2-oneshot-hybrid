@@ -174,7 +174,7 @@ See [LICENSE](LICENSE) for full details.
 
 ### This Integration
 
-- Integration and modifications by [Your Name/Username]
+- Integration and modifications by ArtemSupa
 - Created to solve the M6 detection bottleneck and missing PSK issue
 
 ## 🤝 Contributing
